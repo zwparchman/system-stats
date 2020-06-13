@@ -1,0 +1,3 @@
+This tool provides basic total system information for a computer.
+
+This currently includes gpu, cpu, and memory statistics.

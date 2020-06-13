@@ -1,0 +1,13 @@
+[package]
+name = "system-stats"
+version = "0.1.0"
+authors = ["zack <zwparchman@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+iced = "*"
+iced_futures = { version = "*", features = ["async-std"] }
+async-std = { version = "*", features = ["unstable"] } 
+regex = { version = "1" }

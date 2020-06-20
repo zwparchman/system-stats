@@ -2,6 +2,8 @@ use iced::{
     // button, Button, 
     Command, Align, 
     Column,
+    Checkbox,
+    Space,
     Row, Element, Settings, Text, Application,
     Subscription, ProgressBar, Length
 };
@@ -69,7 +71,7 @@ pub fn main() {
         let mut counter = Counter::new();
         counter.calculate_stats();
 
-        let cpu_speed = format!("Cpu MHz {}", counter.cpu_mhz);
+        let cpu_speed = format!("Cpu MHz {}. Load {}", counter.cpu_mhz, counter.load_avg);
         let mem_stats = format!("Mem: {} of {}", counter.mem_used / 1024, counter.mem_total / 1024);
 
         println!("{}", mem_stats);
@@ -95,7 +97,11 @@ pub fn main() {
 
 struct Counter {
     errors: Vec<String>,
+    cpu_stats_visible: bool,
+    disk_stats_visible: bool,
+
     cpu_mhz: i32,
+    load_avg: String,
     mem_used: i32,
     mem_total: i32,
 
@@ -104,6 +110,7 @@ struct Counter {
     mem_avaliable_regex: Regex,
 
     extract_leading_number_regex: Regex,
+    extract_load_average_regex: Regex,
 
     gpu_max_graphics_clock: i32,
     gpu_current_graphics_clock: i32,
@@ -119,13 +126,19 @@ struct Counter {
 #[derive(Debug, Clone, Copy)]
 enum Message {
     Tick(Instant),
+    OnCpuVisible(bool),
+    OnDiskVisible(bool),
 }
 
 impl Counter {
     fn new() -> Counter {
         Counter {
             errors: Vec::new(),
+            cpu_stats_visible: true,
+            disk_stats_visible: true,
+
             cpu_mhz: 0,
+            load_avg: String::new(),
             mem_used: 0,
             mem_total: 0,
 
@@ -133,6 +146,7 @@ impl Counter {
             mem_total_regex: Regex::new(r"MemTotal:\s+([0-9]+)").unwrap(),
             mem_avaliable_regex: Regex::new(r"MemAvailable:\s+([0-9]+)").unwrap(),
             extract_leading_number_regex: Regex::new(r"\s*([0-9]+)").unwrap(),
+            extract_load_average_regex: Regex::new(r"([0-9\.]+ [0-9\.]+ [0-9\.]+)").unwrap(),
 
             gpu_max_graphics_clock: 0,
             gpu_current_graphics_clock: 0,
@@ -148,6 +162,31 @@ impl Counter {
 
     fn calculate_stats(&mut self) -> () {
         self.cpu_mhz = average_matching_line_in_file(&Path::new("/proc/cpuinfo"), &self.cpu_mhz_regex) as i32;
+
+
+        let path = Path::new("/proc/loadavg");
+        let display = path.display();
+        let mut file = match File::open(&path){
+            Err(why) => panic!("could not open {}: {}", display, why), // TODO find way to remove panic
+            Ok(file) => file,
+        };
+
+        let mut contents = String::new();
+        match file.read_to_string(&mut contents) {
+            Err(why) => panic!("Error reading file {}: {}", display, why), // TODO find way to remove panic
+            Ok(_)=>(),
+        }
+
+        self.load_avg = {
+            let cap = self.extract_load_average_regex.captures(contents.as_str());
+            if cap.is_none() {
+                contents
+            } else {
+                let cap = cap.unwrap();
+                let as_str = cap.get(1).map_or("", |m| m.as_str());
+                as_str.to_string()
+            }
+        };
 
         let path = Path::new("/proc/meminfo");
         let display = path.display();
@@ -255,7 +294,15 @@ impl Application for Counter {
 
     fn update(&mut self, message:Message) -> Command<Message> {
         match message {
-            Message::Tick{..} => { self.calculate_stats(); Command::none() }
+            Message::Tick{..} => { self.calculate_stats(); Command::none() },
+            Message::OnCpuVisible(val) => { 
+                self.cpu_stats_visible = val;
+                Command::none() 
+            },
+            Message::OnDiskVisible(val) =>{
+                self.disk_stats_visible = val;
+                Command::none()
+            }
         }
     }
 
@@ -317,14 +364,40 @@ impl Application for Counter {
                 .push(mem_util)
         };
 
-        let cpu_stats = Column::new()
-            .padding(20)
-            .align_items(Align::Center)
-            .push(Text::new(cpu_speed).size(20))
-            .push(mem)
-            .push(gpu)
-            .into();
-        cpu_stats
+        let cpu_stats = 
+            if self.cpu_stats_visible {
+                Column::new()
+                .padding(20)
+                .align_items(Align::Center)
+                .push( Row::new()
+                    .push(Text::new(cpu_speed).size(20))
+                    .push(Space::with_width(Length::Fill))
+                    .push(Text::new(format!("Load: {}", self.load_avg)).size(20)))
+                .push(mem)
+                .push(gpu)
+            }
+        else {
+            Column::new()
+        };
+
+        let disk_stats = 
+            if self.disk_stats_visible {
+                Column::new()
+            } else {
+                Column::new()
+            };
+
+        let visibility_checks = Row::new()
+            .push( Checkbox::new(self.cpu_stats_visible, "Cpu stats", Message::OnCpuVisible))
+            .push( Checkbox::new(self.disk_stats_visible, "Disk stats", Message::OnDiskVisible))
+                   ;
+
+        let main = Column::new()
+            .push(visibility_checks)
+            .push(cpu_stats)
+            .push(disk_stats);
+
+        main.into()
     }
 }
 

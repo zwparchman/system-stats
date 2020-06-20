@@ -240,11 +240,13 @@ impl Application for Counter {
     type Executor = iced_futures::executor::AsyncStd;
 
     fn new (_flags: () ) -> (Counter, Command<Message>) {
-        ( Counter::new(), Command::none(), )
+        let mut stats = Counter::new();
+        stats.calculate_stats();
+        ( stats, Command::none(), )
     }
 
     fn title(&self)  -> String {
-        String::from("Counter - Iced")
+        String::from("system-stats")
     }
 
     fn subscription(&self) -> Subscription<Message> {
@@ -288,12 +290,12 @@ impl Application for Counter {
                                                     self.gpu_current_graphics_clock as f32,
                                                     self.gpu_max_graphics_clock as f32);
 
-            let gpu_memory_clock = format!("Memory Clock {} of {}", 
-                                           self.gpu_current_memory_clock,
-                                           self.gpu_max_memory_clock);
-            let gpu_memory_clock_bar = labeled_bar(gpu_memory_clock,
-                                                  self.gpu_current_memory_clock as f32,
-                                                  self.gpu_max_memory_clock as f32);
+//            let gpu_memory_clock = format!("Memory Clock {} of {}", 
+//                                           self.gpu_current_memory_clock,
+//                                           self.gpu_max_memory_clock);
+//            let gpu_memory_clock_bar = labeled_bar(gpu_memory_clock,
+//                                                  self.gpu_current_memory_clock as f32,
+//                                                  self.gpu_max_memory_clock as f32);
 
             let gpu_temp_bar = labeled_bar(format!("GPU temp {}", self.gpu_temperature),
                                           self.gpu_temperature as f32 / 100.0, 1.0);
@@ -309,7 +311,7 @@ impl Application for Counter {
                 .align_items(Align::Center)
                 .push(  mem_bar )
                 .push(gpu_graphics_clock_bar)
-                .push(gpu_memory_clock_bar)
+                //.push(gpu_memory_clock_bar)
                 .push(gpu_temp_bar)
                 .push(gfx_util)
                 .push(mem_util)

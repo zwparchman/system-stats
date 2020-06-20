@@ -160,10 +160,7 @@ impl Counter {
         }
     }
 
-    fn calculate_stats(&mut self) -> () {
-        self.cpu_mhz = average_matching_line_in_file(&Path::new("/proc/cpuinfo"), &self.cpu_mhz_regex) as i32;
-
-
+    fn get_load_avg(&mut self){
         let path = Path::new("/proc/loadavg");
         let display = path.display();
         let mut file = match File::open(&path){
@@ -187,17 +184,21 @@ impl Counter {
                 as_str.to_string()
             }
         };
+    }
 
+    fn get_mem_info(&mut self){
         let path = Path::new("/proc/meminfo");
         let display = path.display();
         let mut mem_file = match File::open(&path){
-            Err(why) => panic!("could not open {}: {}", display, why), // TODO find way to remove panic
+            // TODO find way to remove panic
+            Err(why) => panic!("could not open {}: {}", display, why), 
             Ok(file) => file,
         };
 
         let mut contents = String::new();
         match mem_file.read_to_string(&mut contents) {
-            Err(why) => panic!("Error reading file {}: {}", display, why), // TODO find way to remove panic
+            // TODO find way to remove panic
+            Err(why) => panic!("Error reading file {}: {}", display, why), 
             Ok(_)=>(),
         }
 
@@ -206,6 +207,16 @@ impl Counter {
         self.mem_used = self.mem_total - mem_avaliable;
 
 
+
+    }
+
+    fn calculate_stats(&mut self) -> () {
+        self.cpu_mhz = average_matching_line_in_file(
+            &Path::new("/proc/cpuinfo"), 
+            &self.cpu_mhz_regex) as i32;
+
+        self.get_load_avg();
+        self.get_mem_info();
         self.get_gpu_stats();
     }
 
